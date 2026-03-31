@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+dist-electron/
+release/
+out/
+build/
+*.egg-info/
+*.egg
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment — NEVER commit real secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+artifacts/logs/
+npm-debug.log*
+
+# Editor & OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python venv
+venv/
+.venv/
+env/
+
+# Electron packager
+app-builds/
+
+# Local dev workspace files — never commit
+SkillsandPrompts/
+skills.md
+artifacts/plan_phase1_shell.md

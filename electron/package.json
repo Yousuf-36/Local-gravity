@@ -1,0 +1,40 @@
+{
+  "name": "localgravity-electron",
+  "version": "0.1.0",
+  "description": "LocalGravity — Electron main process",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "tsc && cross-env NODE_ENV=development electron dist/main.js",
+    "build": "tsc",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.5.4"
+  },
+  "build": {
+    "appId": "com.localgravity.app",
+    "productName": "LocalGravity",
+    "asar": true,
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.map"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
