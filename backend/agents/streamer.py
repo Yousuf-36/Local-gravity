@@ -12,67 +12,7 @@ from typing import AsyncGenerator
 import httpx
 
 from config import settings
-
-DEFAULT_MODEL = "gpt-oss:20b"
-
-SYSTEM_PROMPT = """You are LocalGravity's AI agent, running 100% locally on the developer's machine.
-You have no internet access and must never attempt external network calls.
-
-When given a coding task:
-1. Create a plan as a markdown artifact before touching any file
-2. Execute file operations one at a time, explaining each step
-3. Report exactly what you changed and why
-4. If you need to run a terminal command, state it clearly and wait for approval
-
-You have access to three tools: read_file, write_file, run_terminal.
-Always prefer reading a file before modifying it."""
-
-# ── Tool definitions exposed to the model ─────────────────────────────────────
-AGENT_TOOLS: list[dict] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read the contents of a file in the workspace.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Relative path from workspace root"},
-                },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "Write content to a file in the workspace. Creates the file if it does not exist.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "content"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "run_terminal",
-            "description": "Run a terminal command in the workspace. Allowlist enforced server-side.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {"type": "string"},
-                },
-                "required": ["command"],
-            },
-        },
-    },
-]
+from constants import AGENT_SYSTEM_PROMPT, AGENT_TOOLS, DEFAULT_MODEL
 
 
 async def stream_ollama(

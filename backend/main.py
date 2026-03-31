@@ -18,9 +18,9 @@ from fastapi.responses import JSONResponse
 
 from config import settings
 from routers import agent, files, ollama, terminal
+from logging_config import get_logger
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(name)s | %(message)s")
-log = logging.getLogger("localgravity")
+log = get_logger("localgravity")
 
 
 async def _check_ollama() -> None:

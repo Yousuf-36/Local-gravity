@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --bg-base: #0A0A0A;
+    --bg-surface: #111111;
+    --bg-elevated: #1A1A1A;
+    --bg-hover: #242424;
+    --bg-selected: #1E2A3A;
+
+    /* Borders */
+    --border-subtle: #1E1E1E;
+    --border-default: #2A2A2A;
+    --border-strong: #3A3A3A;
+
+    /* Text */
+    --text-primary: #E8E8E8;
+    --text-secondary: #888888;
+    --text-muted: #444444;
+    --text-code: #D4D4D4;
+
+    /* Agent / AI accent — warm amber */
+    --agent-primary: #F59E0B;
+    --agent-glow: rgba(245, 158, 11, 0.15);
+    --agent-dim: #78490A;
+
+    /* System / file accent — cool blue */
+    --system-primary: #3B82F6;
+    --system-dim: #1E3A5F;
+
+    /* Status */
+    --status-success: #10B981;
+    --status-error: #EF4444;
+    --status-warning: #F59E0B;
+    --status-running: #6366F1;
+
+    /* Editor */
+    --editor-bg: #0D0D0D;
+    --editor-gutter: #1A1A1A;
+    --editor-line-highlight: #151515;
+  }
+
+  body {
+    @apply bg-[var(--bg-base)] text-[var(--text-primary)] font-sans antialiased overflow-hidden selection:bg-[var(--bg-selected)];
+  }
+
+  /* Custom scrollbar for deep dark mode */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border: 2px solid var(--bg-surface);
+    border-radius: 5px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+  }
+}
+
+@keyframes blink { 
+  0%, 100% { opacity: 1; } 
+  50% { opacity: 0; } 
+}

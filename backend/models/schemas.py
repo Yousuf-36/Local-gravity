@@ -9,8 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
-# ── Allowed Ollama models ─────────────────────────────────────────────────────
-ALLOWED_MODELS: set[str] = {"gpt-oss:20b", "llama3", "deepseek-coder", "qwen2.5-coder", "mistral"}
+from constants import ALLOWED_MODELS
 
 
 # ── Agent ─────────────────────────────────────────────────────────────────────

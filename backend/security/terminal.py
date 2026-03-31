@@ -15,63 +15,7 @@ import re
 import shlex
 from pathlib import Path
 
-# ── Command allowlist (must exist here to be permitted) ───────────────────────
-ALLOWLIST: set[str] = {
-    # File inspection (read-only)
-    "ls", "cat", "head", "tail", "grep", "find", "echo", "pwd", "whoami", "tree",
-    # File creation / movement (non-destructive)
-    "mkdir", "touch", "cp", "mv",
-    # Python ecosystem
-    "python", "python3", "pip", "pip3", "pipenv", "poetry",
-    # Node ecosystem
-    "npm", "npx", "node", "pnpm", "yarn",
-    # Git
-    "git", "gh",
-    # App servers / test runners
-    "uvicorn", "gunicorn", "flask",
-    "pytest", "unittest", "coverage",
-    # Linters / formatters
-    "ruff", "black", "mypy", "flake8", "eslint", "prettier",
-    # Build tools
-    "tsc", "vite", "webpack", "esbuild",
-    # Misc safe tools
-    "make", "cargo",
-}
-
-# ── Command denylist (explicit block, checked before allowlist) ───────────────
-DENYLIST: set[str] = {
-    # Destructive file ops
-    "rm", "rmdir", "dd", "shred", "truncate",
-    # Network exfiltration
-    "curl", "wget", "nc", "ncat", "netcat", "socat",
-    "ssh", "scp", "rsync", "ftp", "sftp",
-    # Privilege escalation
-    "sudo", "su", "doas", "pkexec", "newgrp", "runuser",
-    # System / fs modification
-    "chmod", "chown", "chgrp", "umask",
-    "mount", "umount", "fdisk", "mkfs", "fsck",
-    "systemctl", "service", "launchctl",
-    # Destructive process management
-    "kill", "killall", "pkill", "renice",
-    "shutdown", "reboot", "halt", "poweroff",
-    # Shell / eval bypasses
-    "bash", "sh", "zsh", "fish", "ksh", "csh", "exec",
-    "eval", "source",
-    # System package managers
-    "apt", "apt-get", "yum", "dnf", "brew", "pacman", "snap",
-}
-
-# ── Dangerous shell patterns (reject before parsing) ─────────────────────────
-DANGEROUS_PATTERNS: list[str] = [
-    r"[;&|`$]",          # shell chaining / subshell injection
-    r"\$\(",             # command substitution
-    r">\s*/dev/",        # redirect to device file
-    r">\s*~/",           # redirect to home directory (sneaky overwrite)
-    r"\.\./",            # path traversal in inline paths
-    r"\beval\b",
-    r"\bexec\b",
-    r"\bsource\b",
-]
+from constants import ALLOWLIST, DENYLIST, DANGEROUS_PATTERNS
 
 
 def validate_command(cmd: str, workspace_path: str = "") -> str:  # noqa: ARG001

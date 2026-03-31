@@ -1,126 +1,167 @@
 # LocalGravity
 
-A local-first, privacy-first agentic IDE. No cloud APIs, no telemetry — everything runs on your machine, powered by [Ollama](https://ollama.ai).
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Status](https://img.shields.io/badge/status-Alpha-orange.svg)
 
-Built with **Electron** · **FastAPI** · **React** · **Ollama (GPT-OSS 20B)**
+**LocalGravity** is a modern, privacy-first agentic IDE designed to put the power of a large language model directly on your local machine. No cloud APIs, no subscription fees, no telemetry, and zero network exfiltration risk. It combines the robust editor experience of Monaco (VS Code) with an isolated Python/FastAPI backend and a strictly sandboxed Electron shell.
+
+## Philosophy
+In a world increasingly dependent on cloud-hosted AI, your proprietary source code is often sent across the internet to third parties. **LocalGravity** is built on the belief that developers should have access to state-of-the-art coding agents without sacrificing privacy or granting untrusted internet access to their workspace.
+
+1. **Local-First:** All reasoning remains on-device using [Ollama](https://ollama.ai).
+2. **Security-First:** The Electron shell is explicitly locked down. It refuses to load remote content, blocks Node integration in renderers, and strictly moderates IPC. 
+3. **Transparent Execution:** The AI cannot silently execute commands. All terminal operations and file actions are sandboxed, allowlisted, and require oversight.
 
 ---
 
-## What it is
+## Architecture
 
-LocalGravity is a desktop IDE that puts an AI coding agent next to your editor. The agent can read files, write code, and run sandboxed terminal commands — all without a single byte leaving your machine.
+At its core, LocalGravity is structured as a 3-tier application, strictly separating the generic web UI from the privileged system APIs.
 
+```mermaid
+graph TD
+    subgraph "Desktop Shell (Electron)"
+        M[Main Process<br/>Node.js] 
+        P[Preload Script<br/>ContextBridge]
+    end
+
+    subgraph "Frontend Engine (React)"
+        UI[AppShell & Monaco Editor]
+        hooks[Zustand Store & Hooks]
+        UI <--> hooks
+        hooks <--> P
+    end
+
+    subgraph "Local Operations (Python/FastAPI)"
+        FA[FastAPI Server<br/>Port 8000]
+        SEC[Security Sandbox<br/>Allowlist & Traversal Checks]
+        AG[Agent Orchestrator]
+        FA <--> SEC
+        FA <--> AG
+    end
+
+    subgraph "Local LLM"
+        OLLAMA[Ollama Daemon<br/>Port 11434]
+    end
+
+    P -- "IPC restricted calls" --> M
+    M -- "HTTP API / SSE" --> FA
+    AG -- "JSON /api/chat" --> OLLAMA
 ```
-[File Tree] │ [Monaco Editor] │ [Agent Chat]
+
+- **Frontend:** Provides the rich, reactive editor interface. Hosted as a Vite app.
+- **Desktop Shell:** Manages the window lifecycle and proxies strictly-typed IPC requests to the backend.
+- **Backend:** Executes Python business logic, handles terminal execution safely without `shell=True`, and queries the local LLM.
+
+---
+
+## Prerequisites
+
+Before building or running LocalGravity, ensure your machine meets the following requirements:
+
+- **Node.js** v20.0.0 or higher
+- **Python** v3.12 or higher
+- **Ollama** installed and running (`ollama serve`). [Download Ollama here.](https://ollama.ai/download)
+- **Git**
+
+---
+
+## Setup Instructions
+
+### 1. Model Preparation
+Before running the IDE, pull the specific Ollama model that powers LocalGravity.
+
+```bash
+ollama pull gpt-oss:20b
 ```
 
----
-
-## Stack
-
-| Layer | Technology |
-|---|---|
-| Desktop shell | Electron 33 (sandboxed renderer, contextBridge IPC) |
-| AI backend | FastAPI + Uvicorn (bound to 127.0.0.1 only) |
-| Local model | Ollama — `gpt-oss:20b` |
-| Frontend | React + Vite + TypeScript + TailwindCSS |
-| Editor | Monaco Editor (VS Code engine) |
-
----
-
-## Requirements
-
-- [Node.js](https://nodejs.org) 20+
-- [Python](https://python.org) 3.12+
-- [Ollama](https://ollama.ai) installed and running (`ollama serve`)
-- The `gpt-oss:20b` model pulled: `ollama pull gpt-oss:20b`
-
----
-
-## Getting started
-
-### 1. Clone
-
+### 2. Clone the Repository
 ```bash
 git clone https://github.com/Yousuf-36/Local-gravity.git
 cd Local-gravity
 ```
 
-### 2. Install dependencies
+### 3. Initialize the Backend
+Set up your Python virtual environment and install the locked dependencies.
 
 ```bash
-# Root + Electron + Frontend
-npm run install:all
-
-# Python backend
 cd backend
+python -m venv .venv
+
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
 pip install -r requirements.txt
 cd ..
 ```
 
-### 3. Configure environment
+### 4. Setup the Frontend and Shell
+Copy the local environment template and install the NPM ecosystem.
 
 ```bash
 cp .env.example .env
-# Edit .env if you need to change OLLAMA_HOST or WORKSPACE_ROOT
+npm run install:all
 ```
 
-### 4. Start everything
+### 5. Launch
+Start the complete stack spanning React, Vite, FastAPI, and Electron using the provided concurrently script.
 
 ```bash
 npm run dev
 ```
 
-This starts three processes concurrently:
-- **Electron** shell (TypeScript → `dist/`, then `electron .`)
-- **Vite** dev server for the React frontend on `http://localhost:5173`
-- **Uvicorn** FastAPI backend on `http://127.0.0.1:8000`
+---
+
+## Adding New Ollama Models
+
+LocalGravity maintains a strict allowlist of permitted LLM models to ensure reliability and compatibility with the expected JSON/SSE stream formats. 
+
+To add a new model:
+1. Download it via ollama: `ollama pull <model-name>`
+2. Open `backend/constants.py`.
+3. Locate the `ALLOWED_MODELS` set and add your model name:
+   ```python
+   ALLOWED_MODELS: Set[str] = {"gpt-oss:20b", "llama3", "<model-name>"}
+   ```
+4. Restart the backend to apply your changes.
 
 ---
 
-## Security model
+## Security Model
 
-LocalGravity is built security-first from the ground up:
+Because LocalGravity processes arbitrary strings generated by an LLM, its security model assumes the agent could turn malicious (e.g., via prompt injection) and attempts to sandbox consequence-heavy actions.
 
-| Threat | Defence |
-|---|---|
-| Renderer ↔ Node.js access | `nodeIntegration: false`, `contextIsolation: true`, `sandbox: true` |
-| External network calls | CSP `connect-src` locked to `127.0.0.1:8000` only |
-| Path traversal | `safe_resolve()` on every file operation server-side |
-| Command injection | `validate_command()` — explicit ALLOWLIST + DENYLIST + pattern regex |
-| Prompt injection via files | File content wrapped in `<file_content>` tags before model sees it |
-| Agent HTML output | Rendered via `DOMPurify + marked` — never raw `innerHTML` |
+**Electron Mitigations:**
+- `contextIsolation: true` & `nodeIntegration: false` in all `BrowserWindow` instances.
+- Sandboxed renderers via `sandbox: true`.
+- Zero raw HTML rendering (`DOMPurify` is used strictly on marked output).
 
-The FastAPI backend only ever binds to `127.0.0.1`. It is not reachable from any other network interface.
+**Network Mitigations:**
+- CSP header restricts external network access (`connect-src` locked to localhost).
+- `app.on('web-contents-created')` intercepts and blocks any external `will-navigate` actions.
+
+**File System & Execution Mitigations:**
+- Input validation at the HTTP boundary via Pydantic validators blocks path traversal sequences (e.g. `../`).
+- Terminal commands bypass shell interpreters (`shell=False` via `asyncio.create_subprocess_exec`).
+- A hardcoded `DENYLIST` explicitly blocks dangerous shell executables (`rm`, `wget`, `curl`, `sudo`).
 
 ---
 
-## Project structure
+## Contribution Guidelines
 
-```
-localgravity/
-├── electron/           # Electron main process (TypeScript)
-│   ├── main.ts         # BrowserWindow, app lifecycle
-│   ├── preload.ts      # contextBridge IPC surface
-│   ├── ipc.ts          # All IPC handlers
-│   └── security.ts     # CSP injection, path validation
-├── frontend/           # React renderer (Vite + TypeScript)
-│   └── src/
-│       ├── components/ # AppShell, FileTree, EditorPane, AgentPanel ...
-│       ├── hooks/
-│       └── store/
-├── backend/            # FastAPI Python backend
-│   ├── main.py
-│   ├── config.py
-│   ├── routers/        # agent, files, terminal, ollama
-│   ├── agents/         # streamer, orchestrator
-│   ├── security/       # terminal sandbox
-│   └── models/         # Pydantic schemas
-└── artifacts/          # Agent-generated plans, logs, summaries
-```
+We welcome pull requests for bug fixes, efficiency optimizations, and architectural enhancements! 
+
+When contributing, please ensure:
+- Your code maintains the existing strict separation of concerns over monolithic structures.
+- TypeScript code relies on rigid types (no `any`).
+- Python code includes comprehensive type hints and module docstrings.
+- Python logic utilizes the centralized logger (`backend/logging_config.py`).
+- Security surfaces (IPC definitions, Terminal execution boundaries) require explicit review and exhaustive testing.
 
 ---
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
