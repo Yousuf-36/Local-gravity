@@ -6,7 +6,6 @@ ensuring consistent formatting and level enforcement.
 """
 import logging
 import sys
-from typing import logging as LoggingModuleType
 
 def get_logger(name: str) -> logging.Logger:
     """

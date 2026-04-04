@@ -1,4 +1,4 @@
-import { FileNode, FileReadResponse } from '../types';
+import { FileNode } from '../types';
 
 export const filesApi = {
   /**

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useAppStore } from '../store';
 import { filesApi } from '../api/files';
 
@@ -30,7 +30,9 @@ export function useEditor() {
   const handleOpenFile = useCallback((path: string) => {
     openTab(path);
     if (fileContents[path] === undefined) {
-      loadFile(path).catch(console.error);
+      loadFile(path).catch(() => {
+        // error is already captured in errorFiles state by loadFile
+      });
     }
   }, [openTab, fileContents, loadFile]);
 

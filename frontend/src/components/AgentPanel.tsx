@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useAgent, ChatMessage } from '../hooks/useAgent';
 import { UI_STRINGS } from '../constants';
 import { StatusBadge } from './StatusBadge';
@@ -6,7 +6,6 @@ import { StreamCursor } from './StreamCursor';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
 import { SendHorizonal } from 'lucide-react';
-import { useAppStore } from '../store';
 
 function MessageBubble({ msg, isStreaming, isLast }: { msg: ChatMessage, isStreaming: boolean, isLast: boolean }) {
   const isAgent = msg.role === 'agent';

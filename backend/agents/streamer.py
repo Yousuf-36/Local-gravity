@@ -30,7 +30,7 @@ async def stream_ollama(
     """
     payload: dict = {
         "model": model,
-        "messages": [{"role": "system", "content": SYSTEM_PROMPT}] + messages,
+        "messages": [{"role": "system", "content": AGENT_SYSTEM_PROMPT}] + messages,
         "stream": True,
         "options": {
             "temperature": 0.2,

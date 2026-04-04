@@ -1,5 +1,5 @@
 // --- Agent Types ---
-export type AgentStatus = 'idle' | 'planning' | 'executing' | 'verifying' | 'waiting_approval' | 'done' | 'error';
+export type AgentStatus = 'idle' | 'running' | 'planning' | 'executing' | 'verifying' | 'waiting_approval' | 'done' | 'error';
 
 export interface AgentTask {
   id: string;

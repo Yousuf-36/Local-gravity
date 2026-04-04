@@ -48,8 +48,8 @@ export function useAgent() {
         if (payload.done) {
           setIsAgentStreaming(false);
         }
-      } catch (err) {
-        console.error('Failed to parse agent chunk:', chunk, err);
+      } catch {
+        // silently ignore malformed JSON chunks from the stream
       }
     });
 
