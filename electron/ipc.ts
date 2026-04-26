@@ -101,7 +101,38 @@ export function registerIpcHandlers(win: BrowserWindow, store: AppStore): void {
     return { done: true }
   })
 
-  // ── ollama:listModels ──────────────────────────────────────────────────────
+  // ── agent:approve ──────────────────────────────────────────────────────────
+  // Unblocks a pending HITL approval gate in the executor.
+  ipcMain.handle('agent:approve', async (_, taskId: unknown, callId: unknown) => {
+    if (typeof taskId !== 'string' || typeof callId !== 'string') {
+      throw new Error('agent:approve — taskId and callId must be strings')
+    }
+    const res = await fetch(`${BACKEND}/agent/approve/${taskId}/${callId}`, {
+      method: 'POST',
+    })
+    if (!res.ok) {
+      const err = (await res.json()) as { detail?: string }
+      throw new Error(err.detail ?? 'agent:approve — backend request failed')
+    }
+    return res.json()
+  })
+
+  // ── agent:deny ─────────────────────────────────────────────────────────────
+  // Rejects a pending HITL approval gate — executor emits error frame and halts.
+  ipcMain.handle('agent:deny', async (_, taskId: unknown, callId: unknown) => {
+    if (typeof taskId !== 'string' || typeof callId !== 'string') {
+      throw new Error('agent:deny — taskId and callId must be strings')
+    }
+    const res = await fetch(`${BACKEND}/agent/deny/${taskId}/${callId}`, {
+      method: 'POST',
+    })
+    if (!res.ok) {
+      const err = (await res.json()) as { detail?: string }
+      throw new Error(err.detail ?? 'agent:deny — backend request failed')
+    }
+    return res.json()
+  })
+
   ipcMain.handle('ollama:listModels', async () => {
     const res = await fetch(`${BACKEND}/ollama/models`)
     if (!res.ok) throw new Error('ollama:listModels — backend request failed')

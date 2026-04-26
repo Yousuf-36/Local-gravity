@@ -1,14 +1,29 @@
 """
-constants.py — Application-wide constants mapping for business logic and validation.
+constants.py — Application-wide constants for business logic and validation.
 
-This file holds global static configurations that do not come from the environment,
-such as security allowlists, denylists, model maps, and dangerous patterns.
+This file holds static configurations that do not come from the environment:
+  - Security allowlists and denylists for terminal command sandboxing
+  - Dangerous shell patterns
+  - Agentic loop limits
+  - System prompt for the agent
+
+NOTE: ALLOWED_MODELS was removed — model validation now happens at request
+time against Ollama /api/tags so any locally-installed model is permitted.
+
+NOTE: AGENT_TOOLS was removed — tool schemas are now owned by agents/tools.py.
 """
-from typing import Set, List
+from typing import FrozenSet, List, Set
 
-# ── Allowed Ollama models ─────────────────────────────────────────────────────
-ALLOWED_MODELS: Set[str] = {"gpt-oss:20b", "llama3", "deepseek-coder", "qwen2.5-coder", "mistral"}
-DEFAULT_MODEL: str = "gpt-oss:20b"
+# ── Executor limits ──────────────────────────────────────────────────────────
+MAX_EXECUTOR_STEPS: int = 20
+"""Hard cap on agentic loop steps. Prevents runaway LLM loops."""
+
+DESTRUCTIVE_TOOLS: FrozenSet[str] = frozenset({"write_file", "run_terminal"})
+"""Tool names that require HITL approval before execution."""
+
+DEFAULT_MODEL: str = "llama3"
+"""Fallback model name used when no model is specified."""
+
 
 # ── Command allowlist (must exist here to be permitted) ───────────────────────
 ALLOWLIST: Set[str] = {
@@ -80,50 +95,3 @@ When given a coding task:
 
 You have access to three tools: read_file, write_file, run_terminal.
 Always prefer reading a file before modifying it."""
-
-# ── Tool definitions exposed to the model ─────────────────────────────────────
-AGENT_TOOLS: List[dict] = [
-    {
-        "type": "function",
-        "function": {
-            "name": "read_file",
-            "description": "Read the contents of a file in the workspace.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string", "description": "Relative path from workspace root"},
-                },
-                "required": ["path"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "write_file",
-            "description": "Write content to a file in the workspace. Creates the file if it does not exist.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
-                },
-                "required": ["path", "content"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "run_terminal",
-            "description": "Run a terminal command in the workspace. Allowlist enforced server-side.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {"type": "string"},
-                },
-                "required": ["command"],
-            },
-        },
-    },
-]
