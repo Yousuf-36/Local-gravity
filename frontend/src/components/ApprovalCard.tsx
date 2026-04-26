@@ -55,11 +55,10 @@ export function ApprovalCard({ frame }: Props) {
 
   return (
     <div
-      className="my-3 rounded-lg border overflow-hidden shadow-lg"
+      className="my-3 rounded-lg border overflow-hidden shadow-lg approval-pulse frame-in"
       style={{
         borderColor: 'var(--status-warning)',
         background: 'rgba(255, 170, 0, 0.04)',
-        boxShadow: '0 0 24px rgba(255, 170, 0, 0.08)',
       }}
     >
       {/* Header */}

@@ -24,7 +24,7 @@
 
     /* Agent / AI accent — warm amber */
     --agent-primary: #F59E0B;
-    --agent-glow: rgba(245, 158, 11, 0.15);
+    --agent-glow: rgba(245, 158, 11, 0.08);
     --agent-dim: #78490A;
 
     /* System / file accent — cool blue */
@@ -41,6 +41,19 @@
     --editor-bg: #0D0D0D;
     --editor-gutter: #1A1A1A;
     --editor-line-highlight: #151515;
+
+    /* ── Phase 2 additions ─────────────────────────────────────── */
+    /* Approval card warning glow */
+    --approval-glow: rgba(245, 158, 11, 0.12);
+    /* Settings panel backdrop */
+    --overlay-bg: rgba(0, 0, 0, 0.55);
+    /* Safety level badge colours */
+    --safety-strict:   #EF4444;
+    --safety-balanced: #F59E0B;
+    --safety-off:      #6B7280;
+    /* Diff viewer line backgrounds */
+    --diff-added:   rgba(16, 185, 129, 0.08);
+    --diff-removed: rgba(239, 68, 68, 0.08);
   }
 
   body {
@@ -65,7 +78,89 @@
   }
 }
 
-@keyframes blink { 
-  0%, 100% { opacity: 1; } 
-  50% { opacity: 0; } 
+/* ── Keyframe animations ──────────────────────────────────────────────────── */
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
 }
+
+/* Used by StreamCursor */
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Frame fade-up: every new agent message enters smoothly */
+@keyframes frame-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.frame-in {
+  animation: frame-in 0.18s ease-out both;
+}
+
+/* Approval card warning pulse (draws attention) */
+@keyframes approval-pulse {
+  0%, 100% { box-shadow: 0 0 0 0    rgba(245, 158, 11, 0.0); }
+  50%       { box-shadow: 0 0 18px 2px rgba(245, 158, 11, 0.22); }
+}
+.approval-pulse {
+  animation: approval-pulse 2.4s ease-in-out infinite;
+}
+
+/* Settings panel slide-in from the right */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.settings-slide-in {
+  animation: slide-in-right 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Overlay fade */
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.overlay-fade-in {
+  animation: overlay-fade-in 0.18s ease-out both;
+}
+
+/* ── Diff viewer ──────────────────────────────────────────────────────────── */
+
+.diff-added   { background: var(--diff-added); }
+.diff-removed { background: var(--diff-removed); }
+
+/* ── Safety level badges ──────────────────────────────────────────────────── */
+
+.safety-strict   { color: var(--safety-strict);   border-color: var(--safety-strict); }
+.safety-balanced { color: var(--safety-balanced); border-color: var(--safety-balanced); }
+.safety-off      { color: var(--safety-off);      border-color: var(--safety-off); }
+
+/* ── Prose overrides for agent markdown output ───────────────────────────── */
+
+.prose-agent {
+  @apply text-[var(--text-primary)] leading-relaxed;
+}
+.prose-agent h1, .prose-agent h2, .prose-agent h3 {
+  @apply text-[var(--text-primary)] font-semibold mt-3 mb-1;
+}
+.prose-agent p  { @apply mb-2; }
+.prose-agent ul { @apply list-disc ml-4 mb-2; }
+.prose-agent ol { @apply list-decimal ml-4 mb-2; }
+.prose-agent code {
+  @apply font-mono text-[var(--text-code)] bg-[var(--bg-elevated)] px-1 rounded text-[0.85em];
+}
+.prose-agent pre {
+  @apply bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded p-3 overflow-x-auto mb-3;
+}
+.prose-agent pre code {
+  @apply bg-transparent px-0;
+}
+.prose-agent a {
+  @apply text-[var(--system-primary)] underline underline-offset-2;
+}
+.prose-agent blockquote {
+  @apply border-l-2 border-[var(--border-strong)] pl-3 text-[var(--text-secondary)] italic;
+}
+

@@ -31,11 +31,11 @@ function renderMarkdown(md: string): string {
 
 function PlanBubble({ frame }: { frame: PlanFrame }) {
   return (
-    <div className="mb-3 relative pl-3 py-2 rounded-r-md"
+    <div className="mb-3 relative pl-3 py-2 rounded-r-md frame-in"
       style={{ background: 'var(--agent-glow)', borderLeft: '2px solid var(--agent-primary)' }}>
       <span className="text-[10px] font-mono text-[var(--agent-primary)] mb-1 block uppercase tracking-wider">plan</span>
       <div
-        className="text-sm text-[var(--text-primary)] leading-relaxed prose prose-invert max-w-none prose-pre:bg-[var(--bg-base)] prose-code:text-[var(--text-code)]"
+        className="prose-agent text-sm"
         dangerouslySetInnerHTML={{ __html: renderMarkdown(frame.content) }}
       />
     </div>
@@ -44,13 +44,13 @@ function PlanBubble({ frame }: { frame: PlanFrame }) {
 
 function FinalAnswerBubble({ frame, isStreaming }: { frame: FinalAnswerFrame; isStreaming: boolean }) {
   return (
-    <div className="mb-4 relative pl-3 py-2 rounded-r-md group"
+    <div className="mb-4 relative pl-3 py-2 rounded-r-md group frame-in"
       style={{ background: 'var(--agent-glow)', borderLeft: '2px solid var(--agent-primary)' }}>
       <span className="text-[10px] font-mono text-[var(--agent-primary)] mb-1 block">
         agent · {frame.steps_used} step{frame.steps_used !== 1 ? 's' : ''}
       </span>
       <div
-        className="text-sm text-[var(--text-primary)] leading-relaxed prose prose-invert max-w-none prose-pre:bg-[var(--bg-base)] prose-code:text-[var(--text-code)]"
+        className="prose-agent text-sm"
         dangerouslySetInnerHTML={{ __html: renderMarkdown(frame.content) }}
       />
       {isStreaming && <StreamCursor />}
@@ -69,7 +69,7 @@ function ErrorBubble({ message }: { message: string }) {
 
 function UserBubble({ content }: { content: string }) {
   return (
-    <div className="flex flex-col items-end mb-4">
+    <div className="flex flex-col items-end mb-4 frame-in">
       <div className="bg-[var(--bg-elevated)] border border-[var(--border-default)] rounded px-3 py-2 max-w-[85%]">
         <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap">{content}</p>
       </div>
