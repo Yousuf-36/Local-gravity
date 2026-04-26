@@ -4,163 +4,275 @@
 
 @layer base {
   :root {
-    /* Surfaces */
-    --bg-base: #0A0A0A;
-    --bg-surface: #111111;
+    /* ── Surfaces ─────────────────────────────────────────────────────────────── */
+    --bg-base:     #0A0A0A;
+    --bg-surface:  #111111;
     --bg-elevated: #1A1A1A;
-    --bg-hover: #242424;
+    --bg-hover:    #242424;
     --bg-selected: #1E2A3A;
 
-    /* Borders */
-    --border-subtle: #1E1E1E;
+    /* ── Borders ─────────────────────────────────────────────────────────────── */
+    --border-subtle:  #1E1E1E;
     --border-default: #2A2A2A;
-    --border-strong: #3A3A3A;
+    --border-strong:  #3A3A3A;
 
-    /* Text */
-    --text-primary: #E8E8E8;
+    /* ── Text ────────────────────────────────────────────────────────────────── */
+    --text-primary:   #E8E8E8;
     --text-secondary: #888888;
-    --text-muted: #444444;
-    --text-code: #D4D4D4;
+    --text-muted:     #444444;
+    --text-code:      #D4D4D4;
 
-    /* Agent / AI accent — warm amber */
+    /* ── Agent / AI accent — warm amber ──────────────────────────────────────── */
     --agent-primary: #F59E0B;
-    --agent-glow: rgba(245, 158, 11, 0.08);
-    --agent-dim: #78490A;
+    --agent-glow:    rgba(245, 158, 11, 0.08);
+    --agent-dim:     #78490A;
 
-    /* System / file accent — cool blue */
+    /* ── System / file accent — cool blue ───────────────────────────────────── */
     --system-primary: #3B82F6;
-    --system-dim: #1E3A5F;
+    --system-dim:     #1E3A5F;
 
-    /* Status */
+    /* ── Status ──────────────────────────────────────────────────────────────── */
     --status-success: #10B981;
-    --status-error: #EF4444;
+    --status-error:   #EF4444;
     --status-warning: #F59E0B;
     --status-running: #6366F1;
 
-    /* Editor */
-    --editor-bg: #0D0D0D;
-    --editor-gutter: #1A1A1A;
+    /* ── Editor ──────────────────────────────────────────────────────────────── */
+    --editor-bg:             #0D0D0D;
+    --editor-gutter:         #1A1A1A;
     --editor-line-highlight: #151515;
 
-    /* ── Phase 2 additions ─────────────────────────────────────── */
-    /* Approval card warning glow */
-    --approval-glow: rgba(245, 158, 11, 0.12);
-    /* Settings panel backdrop */
+    /* ── Approval / HITL card ────────────────────────────────────────────────── */
+    --approval-border: #F59E0B;
+    --approval-glow:   rgba(245, 158, 11, 0.12);
+    --approval-bg:     rgba(245, 158, 11, 0.04);
+
+    /* ── Settings panel ──────────────────────────────────────────────────────── */
     --overlay-bg: rgba(0, 0, 0, 0.55);
-    /* Safety level badge colours */
+
+    /* ── Safety level badge colours ──────────────────────────────────────────── */
     --safety-strict:   #EF4444;
     --safety-balanced: #F59E0B;
     --safety-off:      #6B7280;
-    /* Diff viewer line backgrounds */
-    --diff-added:   rgba(16, 185, 129, 0.08);
-    --diff-removed: rgba(239, 68, 68, 0.08);
+
+    /* ── Diff viewer line backgrounds ────────────────────────────────────────── */
+    --diff-added:   rgba(16, 185, 129, 0.10);
+    --diff-removed: rgba(239, 68, 68,  0.10);
+    --diff-added-text:   #10B981;
+    --diff-removed-text: #EF4444;
+
+    /* ── ModelSelector ───────────────────────────────────────────────────────── */
+    --select-bg:     #1A1A1A;
+    --select-border: #2A2A2A;
+    --select-focus:  #3B82F6;
   }
 
   body {
-    @apply bg-[var(--bg-base)] text-[var(--text-primary)] font-sans antialiased overflow-hidden selection:bg-[var(--bg-selected)];
+    @apply bg-[var(--bg-base)] text-[var(--text-primary)] font-sans antialiased overflow-hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    selection: auto;
   }
 
-  /* Custom scrollbar for deep dark mode */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  ::selection {
+    background: var(--bg-selected);
   }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  ::-webkit-scrollbar-thumb {
+
+  /* ── Scrollbar — thin dark-mode style ───────────────────────────────────── */
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  {
     background: var(--border-default);
-    border: 2px solid var(--bg-surface);
-    border-radius: 5px;
+    border-radius: 3px;
   }
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--border-strong);
-  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 }
 
-/* ── Keyframe animations ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* KEYFRAME ANIMATIONS                                                         */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
+/* StreamCursor blink */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+.animate-blink { animation: blink 1s step-end infinite; }
 
-/* Used by StreamCursor */
-.animate-blink {
-  animation: blink 1s step-end infinite;
-}
-
-/* Frame fade-up: every new agent message enters smoothly */
+/* Every new agent frame fades up */
 @keyframes frame-in {
   from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0);   }
 }
-.frame-in {
-  animation: frame-in 0.18s ease-out both;
-}
+.frame-in { animation: frame-in 0.18s ease-out both; }
 
-/* Approval card warning pulse (draws attention) */
-@keyframes approval-pulse {
-  0%, 100% { box-shadow: 0 0 0 0    rgba(245, 158, 11, 0.0); }
-  50%       { box-shadow: 0 0 18px 2px rgba(245, 158, 11, 0.22); }
-}
-.approval-pulse {
-  animation: approval-pulse 2.4s ease-in-out infinite;
-}
-
-/* Settings panel slide-in from the right */
+/* Settings panel slides in from the right edge */
 @keyframes slide-in-right {
   from { transform: translateX(100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
-.settings-slide-in {
-  animation: slide-in-right 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+.settings-slide-in { animation: slide-in-right 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* Overlay fade */
+/* Backdrop fade */
 @keyframes overlay-fade-in {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
-.overlay-fade-in {
-  animation: overlay-fade-in 0.18s ease-out both;
+.overlay-fade-in { animation: overlay-fade-in 0.18s ease-out both; }
+
+/* ApprovalCard warning pulse */
+@keyframes approval-pulse {
+  0%,  100% { box-shadow: 0 0 0   0   rgba(245, 158, 11, 0.00); }
+  50%        { box-shadow: 0 0 20px 4px rgba(245, 158, 11, 0.20); }
+}
+.approval-pulse { animation: approval-pulse 2.4s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* APPROVAL CARD                                                                */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+.approval-card {
+  border: 1px solid var(--approval-border);
+  background: var(--approval-bg);
+  box-shadow: 0 0 0 0 var(--approval-glow);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.approval-card-header {
+  background: var(--approval-glow);
+  border-bottom: 1px solid var(--approval-border);
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--status-warning);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
-/* ── Diff viewer ──────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* DIFF VIEWER                                                                  */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 .diff-added   { background: var(--diff-added); }
 .diff-removed { background: var(--diff-removed); }
+.diff-added   td:nth-child(2) { color: var(--diff-added-text); }
+.diff-removed td:nth-child(2) { color: var(--diff-removed-text); }
 
-/* ── Safety level badges ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* SAFETY LEVEL BADGES                                                          */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 .safety-strict   { color: var(--safety-strict);   border-color: var(--safety-strict); }
 .safety-balanced { color: var(--safety-balanced); border-color: var(--safety-balanced); }
 .safety-off      { color: var(--safety-off);      border-color: var(--safety-off); }
 
-/* ── Prose overrides for agent markdown output ───────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* MODEL SELECTOR                                                               */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Match the design system — used by ModelSelector styled <select> */
+.model-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--select-bg);
+  border: 1px solid var(--select-border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 0.6875rem;   /* 11px */
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23444'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+  transition: border-color 0.15s;
+}
+.model-select:focus {
+  outline: none;
+  border-color: var(--select-focus);
+}
+.model-select:hover {
+  border-color: var(--border-strong);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/* PROSE — AGENT MARKDOWN OUTPUT                                                */
+/* ═══════════════════════════════════════════════════════════════════════════ */
 
 .prose-agent {
-  @apply text-[var(--text-primary)] leading-relaxed;
+  color: var(--text-primary);
+  line-height: 1.65;
+  font-size: 0.875rem;
 }
-.prose-agent h1, .prose-agent h2, .prose-agent h3 {
-  @apply text-[var(--text-primary)] font-semibold mt-3 mb-1;
+.prose-agent h1,
+.prose-agent h2,
+.prose-agent h3,
+.prose-agent h4 {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
 }
-.prose-agent p  { @apply mb-2; }
-.prose-agent ul { @apply list-disc ml-4 mb-2; }
-.prose-agent ol { @apply list-decimal ml-4 mb-2; }
+.prose-agent p   { margin-bottom: 0.5rem; }
+.prose-agent ul  { list-style: disc;    padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.prose-agent ol  { list-style: decimal; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.prose-agent li  { margin-bottom: 0.125rem; }
 .prose-agent code {
-  @apply font-mono text-[var(--text-code)] bg-[var(--bg-elevated)] px-1 rounded text-[0.85em];
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.825em;
+  color: var(--text-code);
+  background: var(--bg-elevated);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
 }
 .prose-agent pre {
-  @apply bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded p-3 overflow-x-auto mb-3;
+  background: var(--editor-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
 }
 .prose-agent pre code {
-  @apply bg-transparent px-0;
+  background: none;
+  padding: 0;
+  font-size: 0.8125rem;
 }
 .prose-agent a {
-  @apply text-[var(--system-primary)] underline underline-offset-2;
+  color: var(--system-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-agent a:hover {
+  color: var(--text-primary);
 }
 .prose-agent blockquote {
-  @apply border-l-2 border-[var(--border-strong)] pl-3 text-[var(--text-secondary)] italic;
+  border-left: 2px solid var(--border-strong);
+  padding-left: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
 }
-
+.prose-agent table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+}
+.prose-agent th,
+.prose-agent td {
+  border: 1px solid var(--border-subtle);
+  padding: 0.3rem 0.6rem;
+  text-align: left;
+}
+.prose-agent th {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.prose-agent hr {
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  margin: 0.75rem 0;
+}

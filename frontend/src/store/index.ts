@@ -53,6 +53,8 @@ interface AppState extends PersistedState {
   // ── Settings ─────────────────────────────────────────────────────────────────
   settingsPanelOpen: boolean;
   setSettingsPanelOpen: (open: boolean) => void;
+  /** Toggle settings panel open/closed — call from AppShell gear button. */
+  toggleSettingsPanel: () => void;
   setSafetyLevel: (level: SafetyLevel) => void;
 }
 
@@ -116,6 +118,8 @@ export const useAppStore = create<AppState>()(
       // ── Settings ──────────────────────────────────────────────────────────────
       settingsPanelOpen: false,
       setSettingsPanelOpen: (open) => set({ settingsPanelOpen: open }),
+      toggleSettingsPanel: () =>
+        set((state) => ({ settingsPanelOpen: !state.settingsPanelOpen })),
       safetyLevel: 'strict',
       setSafetyLevel: (level) => set({ safetyLevel: level }),
     }),

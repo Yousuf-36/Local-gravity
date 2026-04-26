@@ -47,7 +47,7 @@ export function ModelSelector() {
     <select
       value={selectedModel}
       onChange={handleChange}
-      className="text-[11px] font-mono text-[var(--text-secondary)] bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded px-1.5 py-0.5 focus:outline-none focus:border-[var(--system-primary)] transition-colors cursor-pointer hover:border-[var(--border-default)]"
+      className="model-select"
       aria-label="Select Ollama model"
     >
       {availableModels.map((m) => (
