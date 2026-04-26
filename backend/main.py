@@ -3,9 +3,17 @@ main.py — FastAPI application entry point.
 
 Security contract:
   - CORS locked to localhost origins only — no wildcard
-  - Bound to 127.0.0.1 exclusively (enforced by uvicorn launch args in root package.json)
-  - Ollama health checked on startup; failure is logged but does not crash the app
+  - Bound to 127.0.0.1 exclusively (enforced by uvicorn launch args)
+  - Ollama health checked on startup; failure is logged but does not crash
   - All unhandled PermissionError / ValueError map to structured JSON responses
+  - Swagger UI disabled in production (settings.production = True)
+
+Phase 2 lifespan additions:
+  1. Open aiosqlite connection to settings.db_path
+  2. Run idempotent schema migrations
+  3. Wire registry.set_db(db) for write-through persistence
+  4. Load persisted agent tasks into memory: await registry.load_from_db()
+  5. Expose connection as app.state.db for use in dependency injection
 """
 import logging
 from contextlib import asynccontextmanager
@@ -16,11 +24,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from agents.orchestrator import registry
 from config import settings
+from db.database import open_db, run_migrations
 from routers import agent, files, ollama, terminal
 from logging_config import get_logger
 
 log = get_logger("localgravity")
+
 
 
 async def _check_ollama() -> None:
@@ -37,18 +48,32 @@ async def _check_ollama() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan: open DB, run migrations, wire registry, then serve."""
     await _check_ollama()
-    yield
+
+    log.info("Opening DB at %s", settings.db_path)
+    async with open_db(settings.db_path) as db:
+        await run_migrations(db)
+        registry.set_db(db)
+        await registry.load_from_db()
+        app.state.db = db
+        log.info("LocalGravity backend ready.")
+        yield
+
     log.info("LocalGravity backend shutting down.")
+
 
 
 app = FastAPI(
     title="LocalGravity API",
-    version="0.1.0",
-    docs_url="/docs",       # disable in production by setting to None
+    version="0.2.0",
+    # Swagger UI is disabled in production (Electron IPC is the only client).
+    # Set PRODUCTION=true in the environment to disable.
+    docs_url=None if settings.production else "/docs",
     redoc_url=None,
     lifespan=lifespan,
 )
+
 
 # CORS — only localhost origins; the renderer communicates via Electron main process
 # but FastAPI sees requests originating from these origins during dev.
