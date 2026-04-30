@@ -21,6 +21,14 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('agent:stream', listener)
   },
 
+  /** Approve a pending destructive tool call (HITL gate). */
+  approveToolCall: (taskId: string, callId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('agent:approve', taskId, callId),
+
+  /** Deny a pending destructive tool call (HITL gate). */
+  denyToolCall: (taskId: string, callId: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('agent:deny', taskId, callId),
+
   // ── File System ─────────────────────────────────────────────────────────────
   /** Opens a native folder-picker dialog; persists the choice in electron-store. */
   openFolder: (): Promise<string | null> =>

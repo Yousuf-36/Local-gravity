@@ -5,14 +5,16 @@ Responsibilities:
   - stream_ollama(): async generator that yields raw JSON lines from Ollama /api/chat
   - trim_history(): keeps conversation within the context window budget
   - sanitize_file_content_for_prompt(): wraps file content to resist prompt injection
+  - build_tool_result_message(): builds the Ollama ``tool`` role message dict
+    used by the executor to append tool results to conversation history
 """
 import json
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 import httpx
 
 from config import settings
-from constants import AGENT_SYSTEM_PROMPT, AGENT_TOOLS, DEFAULT_MODEL
+from constants import AGENT_SYSTEM_PROMPT, DEFAULT_MODEL
 
 
 async def stream_ollama(
@@ -85,3 +87,24 @@ def sanitize_file_content_for_prompt(content: str, max_chars: int = 4000) -> str
     if len(content) > max_chars:
         truncated += f"\n[TRUNCATED: {len(content) - max_chars} chars omitted]"
     return f"<file_content>\n{truncated}\n</file_content>"
+
+
+def build_tool_result_message(call_id: str, output: str) -> dict[str, Any]:
+    """
+    Build an Ollama ``tool`` role message for a completed tool call.
+
+    Appended to the conversation history after each tool execution so the
+    model can see the result and decide its next action.
+
+    Args:
+        call_id: The UUID4 that identifies the originating tool_call.
+        output:  The sanitized tool output string (XML-wrapped, capped).
+
+    Returns:
+        A dict compatible with the Ollama /api/chat ``messages`` array.
+    """
+    return {
+        "role": "tool",
+        "content": output,
+        "tool_call_id": call_id,
+    }

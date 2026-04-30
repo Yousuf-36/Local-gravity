@@ -1,67 +1,107 @@
 """
-routers/terminal.py — Sandboxed terminal command execution.
+routers/terminal.py — Sandboxed terminal command execution with session management.
 
-Security flow:
+Security flow (exec endpoint):
   1. Pydantic schema validates command length at the HTTP boundary
-  2. validate_command() checks ALLOWLIST, DENYLIST, and dangerous patterns
+  2. PtyManager.execute() calls validate_command() — ALLOWLIST / DENYLIST / patterns
   3. asyncio.create_subprocess_exec (NOT shell=True) prevents shell injection
   4. Execution is capped at settings.terminal_timeout_seconds
-  5. Working directory is always the validated workspace root
+  5. CWD is the session's tracked working_dir (always within workspace)
 
-The endpoint returns a plain JSON response (not streaming) so the Electron
+Session endpoints:
+  GET  /terminal/sessions                   — list active PTY sessions
+  DELETE /terminal/sessions/{workspace_hash} — evict a session by workspace hash
+
+The exec endpoint returns a plain JSON response (not streaming) so the Electron
 IPC handler can call res.json() synchronously.
 """
-import asyncio
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter
-
-from config import settings
+from agents.pty_manager import PtySession, pty_manager
 from models.schemas import TerminalExecRequest, TerminalExecResponse
-from security.terminal import safe_resolve, validate_command
 
 router = APIRouter()
+
+
+# ── Exec (wired through PtyManager) ──────────────────────────────────────────
 
 
 @router.post("/exec", response_model=TerminalExecResponse)
 async def exec_command(req: TerminalExecRequest) -> TerminalExecResponse:
     """
-    Execute a sandboxed terminal command in the workspace directory.
+    Execute a sandboxed terminal command in the workspace's current working directory.
+
+    CWD is tracked per-workspace across calls — ``cd`` commands update the
+    session's working_dir without spawning a shell. All other commands run
+    in that directory via create_subprocess_exec.
 
     Raises:
-        ValueError: if the command fails the allowlist/denylist/pattern check.
-        PermissionError: if workspace path validation fails.
-        TimeoutError: if the command exceeds terminal_timeout_seconds.
+        ValueError:      If the command fails the allowlist/denylist/pattern check.
+        PermissionError: If workspace path validation fails.
+        ValueError:      If the command times out.
     """
-    # 1. Security: validate the command string
-    validated_cmd = validate_command(req.command, req.workspace)
-
-    # 2. Security: resolve workspace path  
-    workspace_path = safe_resolve(req.workspace, ".")
-
-    # 3. Split into args for create_subprocess_exec (avoids shell=True)
-    import shlex
-    args = shlex.split(validated_cmd)
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(workspace_path),
-        )
-        stdout_bytes, stderr_bytes = await asyncio.wait_for(
-            proc.communicate(),
-            timeout=settings.terminal_timeout_seconds,
-        )
-    except asyncio.TimeoutError as exc:
-        raise ValueError(
-            f"Command timed out after {settings.terminal_timeout_seconds}s: {req.command}"
-        ) from exc
-    except FileNotFoundError as exc:
-        raise ValueError(f"Command not found: {args[0]}") from exc
-
-    return TerminalExecResponse(
-        stdout=stdout_bytes.decode("utf-8", errors="replace"),
-        stderr=stderr_bytes.decode("utf-8", errors="replace"),
-        returncode=proc.returncode or 0,
+    stdout, stderr, returncode = await pty_manager.execute(
+        workspace=req.workspace,
+        command=req.command,
     )
+    return TerminalExecResponse(
+        stdout=stdout,
+        stderr=stderr,
+        returncode=returncode,
+    )
+
+
+# ── Session management ────────────────────────────────────────────────────────
+
+
+class SessionInfo(TerminalExecResponse.__class__):
+    """Not reusing a response model — defining inline for clarity."""
+
+
+@router.get("/sessions")
+async def list_sessions() -> list[dict]:
+    """
+    List all active PTY sessions and their current working directories.
+
+    Sessions that have exceeded pty_idle_timeout_seconds are automatically
+    evicted before this list is compiled.
+
+    Returns:
+        List of dicts with workspace, working_dir, workspace_hash, and idle_seconds.
+    """
+    sessions: list[PtySession] = pty_manager.list_sessions()
+    import time
+
+    return [
+        {
+            "workspace": s.workspace,
+            "working_dir": str(s.working_dir),
+            "workspace_hash": s.workspace_hash,
+            "idle_seconds": round(time.monotonic() - s.last_used_at, 1),
+        }
+        for s in sessions
+    ]
+
+
+@router.delete("/sessions/{workspace_hash}")
+async def delete_session(workspace_hash: str) -> dict:
+    """
+    Evict an active PTY session by its workspace hash.
+
+    The workspace_hash is the 8-char hex identifier returned by
+    GET /terminal/sessions. After deletion, the next command for that
+    workspace will start a fresh session at the workspace root.
+
+    Args:
+        workspace_hash: 8-char hex hash identifying the session.
+
+    Raises:
+        HTTPException(404): If no session exists for the given hash.
+    """
+    removed = pty_manager.close_by_hash(workspace_hash)
+    if not removed:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No active session for workspace_hash={workspace_hash!r}",
+        )
+    return {"ok": True, "workspace_hash": workspace_hash, "status": "evicted"}

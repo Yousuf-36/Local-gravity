@@ -10,7 +10,8 @@
     "dev:backend": "cd backend && uvicorn main:app --host 127.0.0.1 --port 8000 --reload --log-level info",
     "install:all": "npm install && cd electron && npm install && cd ../frontend && npm install",
     "build": "cd frontend && npm run build && cd ../electron && npm run build",
-    "lint": "cd frontend && npm run lint && cd ../electron && npm run lint"
+    "lint": "cd frontend && npm run lint && cd ../electron && npm run lint",
+    "dist:win": "cd frontend && npm run build && cd ../electron && npm run dist"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
