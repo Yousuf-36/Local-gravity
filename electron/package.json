@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "tsc && cross-env NODE_ENV=development electron dist/main.js",
     "build": "tsc",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "dist": "npm run build && electron-builder --win",
+    "dist:dir": "npm run build && electron-builder --win --dir"
   },
   "dependencies": {
     "electron-store": "^8.2.0"
@@ -23,12 +25,34 @@
     "appId": "com.localgravity.app",
     "productName": "LocalGravity",
     "asar": true,
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
     "files": [
       "dist/**/*",
       "!dist/**/*.map"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
     },
     "mac": {
       "target": "dmg"
