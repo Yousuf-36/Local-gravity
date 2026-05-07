@@ -3,7 +3,7 @@ test_security.py — Tests for security/terminal.py
 
 Coverage:
   5  allowlist commands that must pass
-  10 denylist commands that must be blocked
+  11 denylist commands that must be blocked (includes ls — removed from allowlist)
   8  dangerous pattern blocks
   5  path traversal attempts in safe_resolve that must raise PermissionError
   2  happy-path safe_resolve calls that must succeed
@@ -17,8 +17,9 @@ from security.terminal import validate_command, safe_resolve
 class TestAllowlist:
     """Commands in ALLOWLIST must return the original command string unchanged."""
 
-    def test_ls_allowed(self):
-        assert validate_command("ls -la") == "ls -la"
+    def test_dir_allowed(self):
+        # 'dir' replaces 'ls' on Windows
+        assert validate_command("dir /B") == "dir /B"
 
     def test_python3_allowed(self):
         assert validate_command("python3 --version") == "python3 --version"
@@ -77,6 +78,12 @@ class TestDenylist:
     def test_nc_blocked(self):
         with pytest.raises(ValueError, match="denylist"):
             validate_command("nc -lvp 4444")
+
+    def test_ls_blocked(self):
+        # 'ls' was removed from the Windows allowlist — it must now be rejected.
+        # It is not on the denylist either, so it hits the "not found" path.
+        with pytest.raises(ValueError):
+            validate_command("ls -la")
 
 
 # ── Dangerous patterns — must raise ValueError before denylist check ──────────

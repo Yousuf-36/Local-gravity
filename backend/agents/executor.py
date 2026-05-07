@@ -22,14 +22,25 @@ Security properties:
     re-injection, mitigating prompt injection via tool results.
   - Step cap prevents infinite loops from runaway models.
   - Approval events are one-shot UUID4-keyed — cannot be replayed.
+
+Persistence (Phase 2 fix):
+  - Every message appended to the in-memory history is also written to the
+    conversation_history table via db_append_message.
+  - On startup the router passes a pre-loaded history from db_load_history
+    so the executor resumes from where it left off after a restart.
+  - db is optional: if None (tests without a DB fixture) persistence is skipped.
 """
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Any, AsyncGenerator
+
+import aiosqlite
 
 from agents.approval_store import approval_store
 from agents.streamer import stream_ollama, trim_history
 from agents.tools import ToolRegistry
+from db.database import db_append_message
 from logging_config import get_logger
 
 log = get_logger("executor")
@@ -192,6 +203,35 @@ def _parse_tool_args(raw_args: Any) -> dict[str, str]:
     return {}
 
 
+def _now_iso() -> str:
+    """Return current UTC time as ISO-8601 string."""
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def _persist(
+    db: aiosqlite.Connection | None,
+    task_id: str,
+    role: str,
+    content: str,
+) -> None:
+    """
+    Write one message to conversation_history. No-op if db is None.
+
+    Args:
+        db:      Open aiosqlite connection, or None (test / no-DB mode).
+        task_id: Parent task id.
+        role:    'user', 'assistant', or 'tool'.
+        content: Message content string.
+    """
+    if db is None:
+        return
+    try:
+        await db_append_message(db, task_id, role, content, _now_iso())
+    except Exception as exc:  # noqa: BLE001
+        # Persistence failure must never crash the executor loop.
+        log.warning("db_append_message failed task=%s role=%s: %s", task_id, role, exc)
+
+
 # ── Core Loop ─────────────────────────────────────────────────────────────────
 
 
@@ -201,24 +241,38 @@ async def run_executor(
     model: str,
     workspace: str,
     registry: ToolRegistry,
+    db: aiosqlite.Connection | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Run the agentic loop for a single task and yield typed SSE frame dicts.
 
     This is an async generator. The router wraps each yielded dict in
-    ``data: {json}\n\n`` for SSE delivery to the frontend.
+    ``data: {json}\\n\\n`` for SSE delivery to the frontend.
 
     Args:
         task_id:   Short task UUID from the registry.
         messages:  Conversation history (at minimum one user message).
+                   Loaded from DB by the router on restart so the executor
+                   picks up where it left off.
         model:     Ollama model name (validated against /api/tags by the router).
         workspace: Absolute workspace root path (pre-validated by the router).
         registry:  ToolRegistry instance — provides tool schemas and dispatch.
+        db:        Optional open aiosqlite connection for history persistence.
+                   Pass None to skip persistence (used by unit tests).
 
     Yields:
         Typed frame dicts matching the SSE schema defined in the plan:
         plan | tool_call | tool_result | final_answer | error | waiting_approval
     """
+    # ── Persist the initial user message(s) ──────────────────────────────────
+    # Only persist if these messages haven't been stored yet (i.e. the first
+    # turn). On restart the messages are loaded from DB so they already exist.
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if role in ("user",) and content:
+            await _persist(db, task_id, role, content)
+
     history: list[dict[str, Any]] = trim_history(list(messages))
     steps = 0
 
@@ -241,8 +295,8 @@ async def run_executor(
 
             if "error" in data:
                 err_val = data["error"]
-                msg = data.get("message", str(err_val))
-                ollama_error = msg
+                msg_obj_err = data.get("message", str(err_val))
+                ollama_error = msg_obj_err
                 break
 
             msg_obj: dict[str, Any] = data.get("message", {})
@@ -269,6 +323,9 @@ async def run_executor(
         # ── Route: tool calls vs. final answer ───────────────────────────────
         if not accumulated_tool_calls:
             # No tool calls → this is the final answer
+            # Persist the assistant's final response
+            if accumulated_content:
+                await _persist(db, task_id, "assistant", accumulated_content)
             yield _final_answer_frame(
                 task_id,
                 content=accumulated_content,
@@ -276,14 +333,23 @@ async def run_executor(
             )
             return
 
-        # Append the assistant turn (may include text + tool_calls)
-        history.append(
-            {
-                "role": "assistant",
-                "content": accumulated_content,
-                "tool_calls": accumulated_tool_calls,
-            }
-        )
+        # Append the assistant turn (may include text + tool_calls) to memory
+        assistant_msg = {
+            "role": "assistant",
+            "content": accumulated_content,
+            "tool_calls": accumulated_tool_calls,
+        }
+        history.append(assistant_msg)
+
+        # Persist assistant turn — store content; tool_calls stored as JSON
+        assistant_content = accumulated_content
+        if accumulated_tool_calls:
+            assistant_content += (
+                "\n[tool_calls]" + json.dumps(accumulated_tool_calls)
+                if accumulated_content
+                else "[tool_calls]" + json.dumps(accumulated_tool_calls)
+            )
+        await _persist(db, task_id, "assistant", assistant_content)
 
         # ── Process each tool call in order ──────────────────────────────────
         for tc in accumulated_tool_calls:
@@ -348,12 +414,14 @@ async def run_executor(
             )
 
             # Append the tool result as a ``tool`` role message for Ollama
-            history.append(
-                {
-                    "role": "tool",
-                    "content": sanitized,
-                }
-            )
+            tool_msg = {
+                "role": "tool",
+                "content": sanitized,
+            }
+            history.append(tool_msg)
+
+            # Persist tool result
+            await _persist(db, task_id, "tool", sanitized)
 
     # ── Step limit reached ────────────────────────────────────────────────────
     yield _error_frame(

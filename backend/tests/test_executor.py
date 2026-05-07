@@ -2,7 +2,8 @@
 test_executor.py — Tests for agents/executor.py
 
 Uses the mock_ollama fixture to avoid real Ollama calls.
-Covers frame builders, helper functions, and the core loop.
+Covers frame builders, helper functions, core loop, and
+conversation history persistence (Fix 1).
 """
 import json
 import pytest
@@ -151,6 +152,7 @@ class TestRunExecutor:
             model="llama3",
             workspace=str(temp_workspace),
             registry=reg,
+            db=None,  # no DB in unit test
         ):
             frames.append(frame)
 
@@ -189,8 +191,280 @@ class TestRunExecutor:
             model="llama3",
             workspace=str(temp_workspace),
             registry=reg,
+            db=None,
         ):
             frames.append(frame)
 
         types = [f["type"] for f in frames]
         assert "tool_call" in types, f"Expected tool_call in {types}"
+
+
+# ── History persistence tests (Fix 1) ────────────────────────────────────────
+
+class TestHistoryPersistence:
+    """
+    Verify that run_executor writes messages to the conversation_history table.
+
+    Strategy:
+    1. Create an in-memory aiosqlite DB with the schema applied.
+    2. Insert a parent task row (FK constraint).
+    3. Run the executor with db= set.
+    4. Query conversation_history and assert the expected rows are present.
+    5. Simulate a restart by loading history from DB and re-running — verify
+       the loaded history is passed through correctly (continuity test).
+    """
+
+    @pytest.mark.asyncio
+    async def test_user_message_persisted(self, temp_workspace, monkeypatch):
+        """Initial user message is written to conversation_history."""
+        import aiosqlite
+        from db.database import run_migrations, db_insert_task, db_load_history
+        from agents.executor import run_executor
+        import agents.executor as executor_mod
+
+        # ── Mock Ollama to return a direct final answer ──────────────────────
+        async def _direct_final(messages, *, model, tools=None):
+            yield json.dumps({
+                "message": {"role": "assistant", "content": "Done.", "tool_calls": []},
+                "done": True,
+            })
+
+        monkeypatch.setattr(executor_mod, "stream_ollama", _direct_final)
+
+        from agents.tools import ToolRegistry, ReadFileTool
+        reg = ToolRegistry()
+        reg.register(ReadFileTool())
+
+        task_id = "hist-persist-1"
+
+        async with aiosqlite.connect(":memory:") as db:
+            db.row_factory = aiosqlite.Row
+            await run_migrations(db)
+            # Insert parent task (FK)
+            await db_insert_task(db, {
+                "id": task_id, "created_at": "2026-01-01T00:00:00",
+                "status": "running", "description": "test", "model": "llama3",
+                "workspace": str(temp_workspace),
+            })
+
+            frames = []
+            async for frame in run_executor(
+                task_id=task_id,
+                messages=[{"role": "user", "content": "hello world"}],
+                model="llama3",
+                workspace=str(temp_workspace),
+                registry=reg,
+                db=db,
+            ):
+                frames.append(frame)
+
+            history = await db_load_history(db, task_id)
+
+        # User message must be persisted
+        roles = [m["role"] for m in history]
+        assert "user" in roles, f"Expected user role in {roles}"
+        user_msgs = [m for m in history if m["role"] == "user"]
+        assert user_msgs[0]["content"] == "hello world"
+
+    @pytest.mark.asyncio
+    async def test_assistant_message_persisted(self, temp_workspace, monkeypatch):
+        """Assistant final answer is written to conversation_history."""
+        import aiosqlite
+        from db.database import run_migrations, db_insert_task, db_load_history
+        from agents.executor import run_executor
+        import agents.executor as executor_mod
+
+        async def _direct_final(messages, *, model, tools=None):
+            yield json.dumps({
+                "message": {"role": "assistant", "content": "My final answer.", "tool_calls": []},
+                "done": True,
+            })
+
+        monkeypatch.setattr(executor_mod, "stream_ollama", _direct_final)
+
+        from agents.tools import ToolRegistry, ReadFileTool
+        reg = ToolRegistry()
+        reg.register(ReadFileTool())
+
+        task_id = "hist-persist-2"
+
+        async with aiosqlite.connect(":memory:") as db:
+            db.row_factory = aiosqlite.Row
+            await run_migrations(db)
+            await db_insert_task(db, {
+                "id": task_id, "created_at": "2026-01-01T00:00:00",
+                "status": "running", "description": "test", "model": "llama3",
+                "workspace": str(temp_workspace),
+            })
+
+            async for _ in run_executor(
+                task_id=task_id,
+                messages=[{"role": "user", "content": "say something"}],
+                model="llama3",
+                workspace=str(temp_workspace),
+                registry=reg,
+                db=db,
+            ):
+                pass
+
+            history = await db_load_history(db, task_id)
+
+        assistant_msgs = [m for m in history if m["role"] == "assistant"]
+        assert len(assistant_msgs) >= 1, f"No assistant messages in {history}"
+        assert "My final answer." in assistant_msgs[0]["content"]
+
+    @pytest.mark.asyncio
+    async def test_tool_result_persisted(self, temp_workspace, monkeypatch):
+        """Tool results are written to conversation_history as 'tool' role."""
+        import aiosqlite
+        from db.database import run_migrations, db_insert_task, db_load_history
+        from agents.executor import run_executor
+        import agents.executor as executor_mod
+
+        _step = {"n": 0}
+
+        async def _tool_then_final(messages, *, model, tools=None):
+            _step["n"] += 1
+            if _step["n"] == 1:
+                # Return a tool call for read_file
+                yield _TOOL_CALL_LINE
+            else:
+                yield _FINAL_ANSWER_LINE
+
+        monkeypatch.setattr(executor_mod, "stream_ollama", _tool_then_final)
+
+        from agents.tools import ToolRegistry, ReadFileTool
+        reg = ToolRegistry()
+        reg.register(ReadFileTool())
+
+        task_id = "hist-persist-3"
+
+        async with aiosqlite.connect(":memory:") as db:
+            db.row_factory = aiosqlite.Row
+            await run_migrations(db)
+            await db_insert_task(db, {
+                "id": task_id, "created_at": "2026-01-01T00:00:00",
+                "status": "running", "description": "test", "model": "llama3",
+                "workspace": str(temp_workspace),
+            })
+
+            async for _ in run_executor(
+                task_id=task_id,
+                messages=[{"role": "user", "content": "read hello.py"}],
+                model="llama3",
+                workspace=str(temp_workspace),
+                registry=reg,
+                db=db,
+            ):
+                pass
+
+            history = await db_load_history(db, task_id)
+
+        roles = [m["role"] for m in history]
+        assert "tool" in roles, f"Expected tool role in history {roles}"
+
+    @pytest.mark.asyncio
+    async def test_no_db_does_not_crash(self, temp_workspace, monkeypatch):
+        """Passing db=None skips persistence without error."""
+        import agents.executor as executor_mod
+
+        async def _direct_final(messages, *, model, tools=None):
+            yield json.dumps({
+                "message": {"role": "assistant", "content": "OK.", "tool_calls": []},
+                "done": True,
+            })
+
+        monkeypatch.setattr(executor_mod, "stream_ollama", _direct_final)
+
+        from agents.tools import ToolRegistry, ReadFileTool
+        from agents.executor import run_executor
+        reg = ToolRegistry()
+        reg.register(ReadFileTool())
+
+        frames = []
+        async for frame in run_executor(
+            task_id="no-db-test",
+            messages=[{"role": "user", "content": "hello"}],
+            model="llama3",
+            workspace=str(temp_workspace),
+            registry=reg,
+            db=None,
+        ):
+            frames.append(frame)
+
+        types = [f["type"] for f in frames]
+        assert "final_answer" in types
+
+    @pytest.mark.asyncio
+    async def test_restart_continuity(self, temp_workspace, monkeypatch):
+        """
+        Simulates a restart: run executor once, load history from DB,
+        feed it back as the initial messages — executor must receive the
+        full prior context on the second run.
+        """
+        import aiosqlite
+        from db.database import run_migrations, db_insert_task, db_load_history
+        from agents.executor import run_executor
+        import agents.executor as executor_mod
+
+        call_log = []
+
+        async def _capturing_final(messages, *, model, tools=None):
+            call_log.append([m["role"] for m in messages])
+            yield json.dumps({
+                "message": {"role": "assistant", "content": "Step done.", "tool_calls": []},
+                "done": True,
+            })
+
+        monkeypatch.setattr(executor_mod, "stream_ollama", _capturing_final)
+
+        from agents.tools import ToolRegistry, ReadFileTool
+        reg = ToolRegistry()
+        reg.register(ReadFileTool())
+
+        task_id = "restart-test"
+
+        async with aiosqlite.connect(":memory:") as db:
+            db.row_factory = aiosqlite.Row
+            await run_migrations(db)
+            await db_insert_task(db, {
+                "id": task_id, "created_at": "2026-01-01T00:00:00",
+                "status": "running", "description": "test", "model": "llama3",
+                "workspace": str(temp_workspace),
+            })
+
+            # ── First run ────────────────────────────────────────────────────
+            async for _ in run_executor(
+                task_id=task_id,
+                messages=[{"role": "user", "content": "first message"}],
+                model="llama3",
+                workspace=str(temp_workspace),
+                registry=reg,
+                db=db,
+            ):
+                pass
+
+            # ── Simulate restart: load history from DB ────────────────────────
+            saved = await db_load_history(db, task_id)
+            # Convert DB rows → executor message format
+            resumed_messages = [{"role": r["role"], "content": r["content"]} for r in saved]
+            # Add a follow-up user message (simulating the user continuing)
+            resumed_messages.append({"role": "user", "content": "follow-up"})
+
+            # ── Second run with loaded history ────────────────────────────────
+            async for _ in run_executor(
+                task_id=task_id,
+                messages=resumed_messages,
+                model="llama3",
+                workspace=str(temp_workspace),
+                registry=reg,
+                db=db,
+            ):
+                pass
+
+        # On the second run, the messages passed to stream_ollama must include
+        # the prior assistant message (loaded from DB).
+        second_run_roles = call_log[1]  # roles seen by Ollama on second call
+        assert "assistant" in second_run_roles, (
+            f"Resumed history should contain prior assistant turn. Got: {second_run_roles}"
+        )

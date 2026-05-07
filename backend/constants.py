@@ -28,7 +28,8 @@ DEFAULT_MODEL: str = "llama3"
 # ── Command allowlist (must exist here to be permitted) ───────────────────────
 ALLOWLIST: Set[str] = {
     # File inspection (read-only)
-    "ls", "cat", "head", "tail", "grep", "find", "echo", "pwd", "whoami", "tree",
+    # NOTE: "ls" removed — does not exist on Windows (use "dir" instead)
+    "dir", "cat", "head", "tail", "grep", "find", "echo", "pwd", "whoami", "tree", "type",
     # File creation / movement (non-destructive)
     "mkdir", "touch", "cp", "mv",
     # Python ecosystem

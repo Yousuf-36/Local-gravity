@@ -18,6 +18,11 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+
 # Environment — NEVER commit real secrets
 .env
 .env.local
@@ -46,3 +51,7 @@ app-builds/
 SkillsandPrompts/
 skills.md
 artifacts/plan_phase1_shell.md
+
+# Scratch logs from dev session captures
+dev_*.txt
+prod_*.txt
